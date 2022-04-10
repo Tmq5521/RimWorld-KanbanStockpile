@@ -135,24 +135,18 @@ namespace KanbanStockpile
         public static int CountStoredSimilarStacks(SlotGroup slotGroup, Map map, Thing thing, int max, KanbanSettings ks = default) {
             int numDuplicates = 0;
             
-            for (int i = 0; i < slotGroup.CellsList.Count; i++) {
-                IntVec3 cell = slotGroup.CellsList[i];
-                List<Thing> things = map.thingGrid.ThingsListAt(cell);
+            foreach (var cell in slotGroup) //for every cell
+            {
+                foreach (var t in map.thingGrid.ThingsListAt(cell)) //for every thing in each cell
+                {
+                    if (!IsSimilarStack(t, thing)) continue; //non similar -> continue
 
-                for (int j = 0; j < things.Count; j++) {
-                    Thing t = things[j];
+                    if (ks.mss > 0) numDuplicates += t.stackCount / ks.mss; //max stack size -> divide stacked items into n "stacks"
+                    else numDuplicates++; //otherwise add 1 similar stack
 
-                    if (!IsSimilarStack(t, thing)) continue;
-                    
-                    //prf compat if one stack adds up to multiple max stack sizes add as multiple stacks
-                    if (ks.mss > 0) numDuplicates += (int)Math.Ceiling((decimal)t.stackCount / ks.mss);
-                    else numDuplicates++;
-                    if (numDuplicates >= max) {
-                        return numDuplicates;
-                    }
+                    if (numDuplicates >= max) return numDuplicates; //return after [max] similar stacks
                 }
             }
-
             // if we got here we didn't hit the max count, so return what we did find
             return numDuplicates;
         }
@@ -165,17 +159,14 @@ namespace KanbanStockpile
             numDesired = 0;
             Thing lowestQtyThing = null;
 
-            List<Thing> things = map.thingGrid.ThingsListAt(cell);
-            for (int i = 0; i < things.Count; i++) {
-                Thing t = things[i];
+            foreach (var t in map.thingGrid.ThingsListAt(cell)) {
                 if (!t.def.EverStorable(false)) continue; // skip non-storable things as they aren't actually *in* the stockpile
                 if (!t.CanStackWith(thing)) continue; // skip it if it cannot stack with thing to haul
 
                 // at this point we have a similar stack so save it here and search the rest of things
                 // and only work on the similar stack that has the lowest count (in case there are say 3x stacks in one cell)
                 // which will refill the lowest stacks first then continue to the highest stacks in the cell
-                if (lowestQtyThing == null)
-                    lowestQtyThing = t;
+                if (lowestQtyThing == null) lowestQtyThing = t;
                 else if (t.stackCount < lowestQtyThing.stackCount)
                     lowestQtyThing = t;
             }
@@ -184,7 +175,7 @@ namespace KanbanStockpile
             if (lowestQtyThing == null) return false;
 
             //stack limit for lowest quantaty thing
-            int stackLimit = (ks.mss > 0) ? System.Math.Min(lowestQtyThing.def.stackLimit, ks.mss) : lowestQtyThing.def.stackLimit;
+            int stackLimit = (ks.mss > 0) ? Math.Min(lowestQtyThing.def.stackLimit, ks.mss) : lowestQtyThing.def.stackLimit;
 
             // we have at least one similar stack, so figure out if it wants anything or not
             if (lowestQtyThing.stackCount > (stackLimit * ks.srt / 100f))
@@ -233,9 +224,8 @@ namespace KanbanStockpile
             var reservations = ReservationsListInfo.GetValue(map.reservationManager) as List<ReservationManager.Reservation>;
             if (reservations == null) return 0;
 
-            ReservationManager.Reservation r;
-            for (int i = 0; i < reservations.Count; i++) {
-                r = reservations[i];
+
+            foreach (var r in reservations) {
                 if (r == null) continue;
                 if (r.Job == null) continue;
                 if (!(r.Job.def == JobDefOf.HaulToCell ||
@@ -251,7 +241,7 @@ namespace KanbanStockpile
                 if (!IsSimilarStack(t, thing)) continue;
 
                 //prf compat if one stack adds up to multiple max stack sizes add as multiple stacks
-                if (ks.mss > 0) numDuplicates += (int)Math.Ceiling((decimal)t.stackCount / ks.mss);
+                if (ks.mss > 0) numDuplicates += t.stackCount / ks.mss;
                 else numDuplicates++;
 
                 if (numDuplicates >= max) {
